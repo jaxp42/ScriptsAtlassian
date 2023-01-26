@@ -5,11 +5,12 @@
 /*************************SCRIPT CONFIGURATION*********************************/
 /******************************************************************************/
 
-CONFLUENCE_BASE_URL = "https://ws001.sspa.juntadeandalucia.es/confluence"
-PAGE_ID = 134152138
-DIRECTORY_PATH = "C:\\SIS_TEC_SERVICIOS\\SIS_JA00_SVC_Athos"
-SESSION_COOKIE = ""
+CONFLUENCE_BASE_URL = "<CONFLUENCE_BASE_URL>"
+PAGE_ID = 123456789
+DIRECTORY_PATH = "<PATH_TO_DIRECTORY>"
+SESSION_COOKIE = "AUTH_SESSION_COOKIE"
 RECURSE = true // set true to get all files in subdirectories, false to upload only the directorie's files
+RETRIES = 0 //number or retries in case the request fails
 
 /******************************************************************************/
 /***************************END CONFIGURATION**********************************/
@@ -18,7 +19,6 @@ RECURSE = true // set true to get all files in subdirectories, false to upload o
 def directory = new File(DIRECTORY_PATH)
 def fileList = []
 
-//Get file from directory
 if(RECURSE){
     directory.eachFileRecurse{
         if(it.isFile()){
@@ -33,56 +33,63 @@ if(RECURSE){
     }
 }
 
-fileList.each{
-    uploadAttachment(it)
-}
+createRequest(fileList)
 
 
-def uploadAttachment(file){
-    println("Uploading " + file.name)
-    createRequest(file)
-}
 
-def createRequest(file){
+def createRequest(fileList){
+    println("Uploading files to confluence page with ID: " + PAGE_ID)
     def url = CONFLUENCE_BASE_URL + "/rest/api/content/" + PAGE_ID + "/child/attachment"
-    println(url)
     def request;
 
     try{
-        def fileBytes = file.bytes //transform file to byte[]
         String boundary = UUID.randomUUID().toString();
 
-        //create http post connection
-        request = (HttpURLConnection) new URL(url).openConnection()
-        request.setRequestMethod("POST")
-        request.setRequestProperty("Content-Type", "multipart/form-data;boundary=" + boundary);
-        request.setRequestProperty("Accept", "application/json")
-        request.setRequestProperty("X-Atlassian-Token", "no-check")
-        request.setDoOutput(true)
+        connection = (HttpURLConnection) new URL(url).openConnection()
+        connection.setRequestMethod("POST")
+        connection.setRequestProperty("Content-Type", "multipart/form-data;boundary=" + boundary);
+        connection.setRequestProperty("Accept", "application/json")
+        connection.setRequestProperty("X-Atlassian-Token", "no-check")
+        connection.setRequestProperty("Cookie", "JSESSIONID=" + SESSION_COOKIE) //auth cookie, you can use another auth method
+        connection.setDoOutput(true)
 
-        DataOutputStream dos = new DataOutputStream(request.getOutputStream());
+        DataOutputStream dataOutputStream = new DataOutputStream(connection.getOutputStream());
 
-        def fileInputStream = new FileInputStream(file);
+        addFilesToBody(dataOutputStream, fileList, boundary)
+        dataOutputStream.flush()
+        dataOutputStream.close()
 
-        dos.writeBytes("--" + boundary + "\r\n");
-        dos.writeBytes("Content-Disposition: form-data; name=\"file\"; filename=\"" + file.name + "\"\r\n");
-        dos.write(fileBytes);
-        dos.writeBytes("\r\n");
-        dos.writeBytes("--" + boundary + "--\r\n");
-        dos.flush();
 
-        def statusCode = request.getResponseCode()
-        println(statusCode)
+        def inputStreamReader = new InputStreamReader(connection.getInputStream(), "utf-8")
+        def response = new StringBuilder()
+        def line = null;
 
-        //add file to post body
-        // OutputStream os = request.getOutputStream()
-        // os.write(fileBytes, 0, fileBytes.length)
-        
+        def bufferedReader = new BufferedReader(inputStreamReader)
+        while((line = bufferedReader.readLine()) != null){
+            response.append(line)
+        }
+
+        println(response)
 
     }catch(Exception e){
-        println("Exception uploading file " + file.name)
+        println("Exception uploading file list")
         println(e)
     }
+}
+
+def addFilesToBody(dataOutputStream, fileList, boundary){
+    fileList.each{
+        dataOutputStream.writeBytes("--" + boundary + "\r\n")
+        dataOutputStream.writeBytes("Content-Disposition: form-data; name=\"file\"; filename=\"" + it.name + "\"\r\n\r\n")
+        dataOutputStream.write(it.bytes)
+        dataOutputStream.writeBytes("\r\n")
+    }
+
+        dataOutputStream.writeBytes("--" + boundary + "--\r\n");
+}
+
+def isSuccesfull(statusCode){
+    return (statusCode >= 200 && statusCode < 300)
 }
 
 
