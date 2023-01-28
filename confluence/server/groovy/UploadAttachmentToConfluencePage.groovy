@@ -5,10 +5,10 @@
 /***********************  SCRIPT CONFIGURATION  *******************************/
 /******************************************************************************/
 
-CONFLUENCE_BASE_URL = "<CONFLUENCE_BASE_URL>"
-PAGE_ID = 123456789
-DIRECTORY_PATH = "<PATH_TO_DIRECTORY>"
-SESSION_COOKIE = "AUTH_SESSION_COOKIE"
+CONFLUENCE_BASE_URL = "https://ws001.sspa.juntadeandalucia.es/confluence"
+PAGE_ID = 136020393
+DIRECTORY_PATH = "C:\\SIS_TEC_SERVICIOS\\SIS_JA40_SVC_Coanh" //BEWARE SPECIAL CHARACTERS LIKE ACCENTS
+SESSION_COOKIE = "D313727F84AEAA8EDBB82679AD6349AA"
 RECURSE = true // set true to get all files in subdirectories, false to upload only the files in the directory specified before
 AUTO_RENAME = true //set true to rename automatically the files with a repeated name.
 
@@ -36,7 +36,8 @@ if(RECURSE){
 
 
 if(duplicatedFileList.size() > 0){
-    showFileList(duplicatedFileList, "The following files have a duplicated name. Please rename them manually to continue or set AUTO_RENAME true to rename them manually.")
+    showFileList(duplicatedFileList, 
+        "The following files have a duplicated name. Please rename them manually to continue or set AUTO_RENAME to true to rename them automatically.")
 }
 else{
     showFileList(fileList, "Next " + ColorEnum.MAGENTA.value + fileList.size() + " files" + ColorEnum.DEFAULT.value 
@@ -51,31 +52,33 @@ else{
 
 
 def addFileToList(fileList, duplicatedFileList, file){
-    def repeatedName = isNameRepeated(fileList, file.name)
-    def counter = 0
+    if(!file.name.startsWith("~\$") && file.name != "Thumbs.db"){
+        def repeatedName = isNameRepeated(fileList, file.name)
+        def counter = 0
 
-    if(repeatedName && AUTO_RENAME){
-        while(repeatedName){ //add (x) in the end of the file name until its not repeated
-            counter++
-            def newName = addModifierToName(file.path, counter)
-            repeatedName = isNameRepeated(fileList, newName)
+        if(repeatedName && AUTO_RENAME){
+            while(repeatedName){ //add (x) in the end of the file name until its not repeated
+                counter++
+                def newName = addModifierToName(file.path, counter)
+                repeatedName = isNameRepeated(fileList, newName)
 
-            if(!repeatedName){
-                println(ColorEnum.RED.value + "File " + file.name + " is repeated" + ColorEnum.DEFAULT.value)
-                println(file)
-                println(" is renamed to " +  newName)
-                file.renameTo(newName)
-                file = new File(newName)
+                if(!repeatedName){
+                    println(ColorEnum.RED.value + "File " + file.name + " is repeated" + ColorEnum.DEFAULT.value)
+                    println(file)
+                    println(" is renamed to " +  newName)
+                    file.renameTo(newName)
+                    file = new File(newName)
+                }
             }
-        }
 
-        fileList << file
-    }
-    else if(repeatedName && !AUTO_RENAME){
-        duplicatedFileList << file
-    }
-    else{
-        fileList << file
+            fileList << file
+        }
+        else if(repeatedName && !AUTO_RENAME){
+            duplicatedFileList << file
+        }
+        else{
+            fileList << file
+        }
     }
 }
 
